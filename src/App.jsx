@@ -1,4 +1,13 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { createClient } from "@supabase/supabase-js";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
+
+const API_URL = import.meta.env.VITE_API_URL || "https://edgemind-backend-production.up.railway.app";
 
 // ─── TRANSLATIONS ─────────────────────────────────────────────────────────────
 const T = {
@@ -50,7 +59,7 @@ const T = {
     pricing_title: "PRECIOS SIMPLES.",
     pricing_sub: "Elige tu nivel de responsabilidad.",
     plan_name: "EDGEMIND COACHING", plan_price_mo: "$49", plan_price_yr: "$409", plan_per_mo: "/mes", plan_per_yr: "/año",
-    plan_desc: "Tu coach personal de rendimiento — disponible antes, durante y después de cada sesión. Te hace seguimiento. Conoce tus reglas. Recuerda todo.",
+    plan_desc: "Tu coach personal de rendimiento — disponible antes, durante y después de cada sesión.",
     plan_features: ["Briefing matutino personalizado", "Check-in mental pre-sesión", "Check-ins durante tu ventana de sesión", "Cierre de sesión — cierra la plataforma AHORA", "Resumen post-sesión y responsabilidad", "Recordatorio nocturno si no registraste", "Revisión semanal de rendimiento dominical", "50 interacciones de coaching/día", "Memoria completa — referencia tus sesiones por fecha"],
     plan_cta: "COMENZAR PRUEBA GRATIS →",
     plan_save: "AHORRA 30% — $179/año",
@@ -66,7 +75,7 @@ const T = {
     hero_line2: "LUCRAR NO",
     hero_line3: "MERCADO.",
     hero_sub: "A maioria dos traders falha pela mente, não pela estratégia.",
-    hero_body: "EdgeMind é um sistema de coaching de performance construído sobre os mesmos frameworks psicológicos usados por coaches profissionais de prop firms. Suas regras. Sua responsabilidade. Entregues no seu celular todos os dias.",
+    hero_body: "EdgeMind é um sistema de coaching de performance construído sobre os mesmos frameworks psicológicos usados por coaches profissionais de prop firms.",
     hero_cta: "CRIAR MEU SISTEMA →",
     hero_trial: "7 dias grátis · Sem cartão de crédito",
     stat1_v: "73%", stat1_d: "das falhas de traders são psicológicas, não estratégicas",
@@ -79,7 +88,7 @@ const T = {
     pricing_title: "PREÇOS SIMPLES.",
     pricing_sub: "Escolha seu nível de responsabilidade.",
     plan_name: "EDGEMIND COACHING", plan_price_mo: "$49", plan_price_yr: "$409", plan_per_mo: "/mês", plan_per_yr: "/ano",
-    plan_desc: "Seu coach pessoal de desempenho — disponível antes, durante e depois de cada sessão. Acompanha você. Conhece suas regras. Lembra de tudo.",
+    plan_desc: "Seu coach pessoal de desempenho — disponível antes, durante e depois de cada sessão.",
     plan_features: ["Briefing matinal personalizado", "Check-in mental pré-sessão", "Check-ins durante sua janela de sessão", "Fechamento de sessão — feche a plataforma AGORA", "Resumo pós-sessão e responsabilidade", "Lembrete noturno se não registrou", "Revisão semanal de desempenho dominical", "50 interações de coaching/dia", "Memória completa — referencia suas sessões por data"],
     plan_cta: "COMEÇAR TESTE GRÁTIS →",
     plan_save: "ECONOMIZE 30% — $179/ano",
@@ -93,8 +102,8 @@ const T = {
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const VALID_PROMOS = {
-  "FREE10": { plan: "performance", months: 3, label: "3 months EdgeMind FREE" },
-  "ANNUAL30": { plan: "performance", months: 1, label: "1 month EdgeMind FREE" },
+  "FREE10":  { plan: "performance", months: 3, label: "3 months EdgeMind FREE" },
+  "ANNUAL30":{ plan: "performance", months: 1, label: "1 month EdgeMind FREE" },
 };
 
 const TESTIMONIALS = [
@@ -105,55 +114,6 @@ const TESTIMONIALS = [
 ];
 
 const ACTIVE_TRADERS = 847;
-
-const buildSystemPrompt = (profile, rules, quizAnswers) => {
-  const rulesList = Object.entries(rules).filter(([,v])=>v.enabled).map(([,v])=>`• ${v.label}: ${v.value}`).join("\n");
-  const quizContext = quizAnswers ? `\nPRE-SESSION STATE:\n- Sleep quality: ${quizAnswers.sleep}/5\n- Stress level: ${quizAnswers.stress}/5\n- Financial pressure today: ${quizAnswers.pressure}` : "";
-  return `You are an elite trading performance coach named EdgeMind. You are direct, warm, honest, and deeply knowledgeable about trader psychology. You do not lecture. You coach. You never mention being an AI or a bot — you are simply the trader's coach. If asked what you are, say you are a performance coaching system built on proven psychological frameworks.
-
-TRADER PROFILE:
-- Name: ${profile.name}
-- Experience: ${profile.experience}
-- Platform: ${profile.platform}
-- Instrument: ${profile.instrument}
-- Biggest Challenges: ${(profile.challenges||[]).join(", ")}
-${quizContext}
-
-THEIR NON-NEGOTIABLE RULES:
-${rulesList}
-
-YOUR COACHING PHILOSOPHY:
-- The market is not the enemy. The trader's own psychology is.
-- Rules set when calm are the only rules that count. The emotional version of a trader is not qualified to make trading decisions.
-- Discipline is a skill built through structure, accountability, and repetition.
-- Your motto: "You can make money in the market — but are you disciplined enough to keep it?"
-
-KEY PSYCHOLOGICAL PATTERNS YOU UNDERSTAND DEEPLY:
-- Revenge trading: loss → emotional escalation → bigger loss
-- "I can always make more" trap: destroys winning days
-- Identity attachment to P&L: self-worth tied to daily results
-- Self-sabotage cycles: unconscious destruction of success
-- Dopamine-seeking: trading for the high, not the edge
-- Rule abandonment under stress: prefrontal cortex goes offline under pressure
-
-YOUR ROLE:
-- Be their daily accountability partner
-- When rules followed: celebrate genuinely, reinforce their identity as a disciplined trader
-- When rules broken: no shame, but be direct — identify the trigger, name the pattern, redirect
-- For check-ins (Done. Made/Lost $X. Rules: Yes/No): respond in under 120 words unless they need more
-- Always ask ONE focused coaching question per response to build self-awareness
-- Reference their specific rules and challenges by name
-- Never be generic. Every response should feel written specifically for this trader.
-- If pre-session stress is high (4-5) or sleep is poor (1-2): warn them gently before they trade
-
-BROKEN RULE PROTOCOL:
-When a rule is broken: (1) acknowledge without shame, (2) identify the psychological pattern, (3) ask what triggered it, (4) redirect to the rule and why it exists.
-
-EMERGENCY STOP PROTOCOL:
-If user sends 🚨 STOP or mentions emergency stop: immediately respond with a calming circuit breaker. Tell them to close the platform NOW, step away for 10 minutes, and come back only when they can name what emotion triggered the urge. Be firm but compassionate.
-
-DAILY CHECK-IN FORMAT: "Done. Made/Lost $X. Rules: Yes/No"`;
-};
 
 const DEFAULT_RULES = {
   profitTarget:     { label:"Daily Profit Target",            category:"money",    type:"dollar",  defaultVal:"500",  icon:"💰", desc:"Hit this → close platform immediately. No exceptions.", enabled:true },
@@ -166,7 +126,7 @@ const DEFAULT_RULES = {
   noNewsBefore:     { label:"No Trading X mins Before News",  category:"time",     type:"number",  defaultVal:"30",   icon:"📰", desc:"News events are not setups. They are gambling.", enabled:false },
   consecLossDays:   { label:"Consecutive Loss Days = Day Off",category:"time",     type:"number",  defaultVal:"3",    icon:"🔄", desc:"3 red days in a row → mandatory day off.", enabled:false },
   maxTrades:        { label:"Max Trades Per Day",             category:"behavior", type:"number",  defaultVal:"5",    icon:"🎯", desc:"Overtrading is a compulsion, not a strategy.", enabled:false },
-  consecLossTrades: { label:"Consecutive Losses = Stop",     category:"behavior", type:"number",  defaultVal:"3",    icon:"🚨", desc:"3 losing trades in a row → mindset is compromised.", enabled:false },
+  consecLossTrades: { label:"Consecutive Losses = Stop",      category:"behavior", type:"number",  defaultVal:"3",    icon:"🚨", desc:"3 losing trades in a row → mindset is compromised.", enabled:false },
   noAddToLoser:     { label:"Never Add To A Losing Position", category:"behavior", type:"toggle",  defaultVal:"true", icon:"🚫", desc:"This is how accounts die. Non-negotiable.", enabled:false },
   noStressTrading:  { label:"No Trading After Stressful Events",category:"behavior",type:"toggle", defaultVal:"true", icon:"🧠", desc:"Argument, anxiety, bad news = no trading.", enabled:false },
   preRoutine:       { label:"Pre-Session Routine Required",   category:"behavior", type:"toggle",  defaultVal:"true", icon:"🌅", desc:"No routine completed = no trading. Period.", enabled:false },
@@ -198,14 +158,12 @@ const EXPERIENCES = ["Under 1 year","1–2 years","2–5 years","5–10 years","
 const PLATFORMS   = ["TopStep","FTMO","Apex Trader Funding","My Funded Futures","Bulenox","Retail (no prop firm)","Other"];
 const INSTRUMENTS = ["Futures (ES, NQ, MNQ, MES)","Forex","Stocks","Options","Crypto","Multiple"];
 
-const formatTime12 = () => new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
-
-// ─── DISCIPLINE SCORE ─────────────────────────────────────────────────────────
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
 const calcDisciplineScore = (sessions, streak) => {
   if (sessions.length === 0) return 0;
-  const rateScore    = (sessions.filter(s=>s.rulesFollowed).length / sessions.length) * 50;
-  const streakScore  = Math.min(streak * 2, 30);
-  const volumeScore  = Math.min(sessions.length * 2, 20);
+  const rateScore   = (sessions.filter(s => s.rulesFollowed).length / sessions.length) * 50;
+  const streakScore = Math.min(streak * 2, 30);
+  const volumeScore = Math.min(sessions.length * 2, 20);
   return Math.round(rateScore + streakScore + volumeScore);
 };
 
@@ -223,145 +181,261 @@ const scoreLabel = (score) => {
   return "STARTING";
 };
 
-// ─── MARKDOWN ─────────────────────────────────────────────────────────────────
-const Md = ({ text }) => {
-  const lines = (text||"").split("\n");
-  return lines.map((line,li) => {
-    const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
-    return (
-      <span key={li}>
-        {parts.map((p,i) => {
-          if (p.startsWith("**")&&p.endsWith("**")) return <strong key={i} style={{color:"#00E676",fontWeight:700}}>{p.slice(2,-2)}</strong>;
-          if (p.startsWith("*")&&p.endsWith("*"))   return <em key={i} style={{color:"#6FCF6F"}}>{p.slice(1,-1)}</em>;
-          return <span key={i}>{p}</span>;
-        })}
-        {li < lines.length-1 && <br/>}
-      </span>
-    );
-  });
-};
-
 const ruleValueDisplay = (key, rule) => {
   if (!rule.enabled) return null;
-  if (rule.type==="dollar")  return `$${rule.value||rule.defaultVal}`;
-  if (rule.type==="time")    return rule.value||rule.defaultVal;
-  if (rule.type==="number")  return rule.value||rule.defaultVal;
-  if (rule.type==="toggle")  return "Active";
-  if (rule.type==="text")    return rule.value||"Set";
+  if (rule.type === "dollar")  return `$${rule.value || rule.defaultVal}`;
+  if (rule.type === "time")    return rule.value || rule.defaultVal;
+  if (rule.type === "number")  return rule.value || rule.defaultVal;
+  if (rule.type === "toggle")  return "Active";
+  if (rule.type === "text")    return rule.value || "Set";
   return rule.value;
+};
+
+const fmtDate = (d) => {
+  if (!d) return "";
+  const dt = new Date(d + "T12:00:00");
+  return dt.toLocaleDateString("en-US", { month:"short", day:"numeric" });
 };
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [lang, setLang]               = useState("en");
+  const [lang, setLang] = useState("en");
   const t = T[lang];
 
-  const [screen, setScreen]           = useState("landing");
-  const [step, setStep]               = useState(0);
-  const [profile, setProfile]         = useState({ name:"", experience:"", platform:"", instrument:"", challenges:[], phone:"", coachLanguage:"english" });
-  const [rules, setRules]             = useState(() => { const r={}; Object.entries(DEFAULT_RULES).forEach(([k,v])=>{r[k]={...v,value:v.defaultVal};}); return r; });
-  const [messages, setMessages]       = useState([]);
-  const [input, setInput]             = useState("");
-  const [loading, setLoading]         = useState(false);
-  const [activeTab, setActiveTab]     = useState("coach");
-  const [sessions, setSessions]       = useState([]);
-  const [streak, setStreak]           = useState(0);
+  // ── Auth ────────────────────────────────────────────────────────────────────
+  const [session, setSession]       = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [authError, setAuthError]   = useState("");
+
+  // ── Onboarding account setup ─────────────────────────────────────────────────
+  const [accountEmail, setAccountEmail]           = useState("");
+  const [accountPassword, setAccountPassword]     = useState("");
+  const [accountConfirmPw, setAccountConfirmPw]   = useState("");
+
+  // ── App screens ──────────────────────────────────────────────────────────────
+  const [screen, setScreen]         = useState("landing");
+  const [step, setStep]             = useState(0);
+  const [loading, setLoading]       = useState(false);
+
+  // ── Profile & rules ──────────────────────────────────────────────────────────
+  const [profile, setProfile]       = useState({ name:"", experience:"", platform:"", instrument:"", challenges:[], phone:"", coachLanguage:"english" });
+  const [rules, setRules]           = useState(() => { const r={}; Object.entries(DEFAULT_RULES).forEach(([k,v])=>{r[k]={...v,value:v.defaultVal};}); return r; });
   const [expandedCat, setExpandedCat] = useState("money");
-  const [selectedPlan, setSelectedPlan] = useState("performance");
-  const [billing, setBilling]         = useState("monthly"); // monthly | annual
+
+  // ── Dashboard data ────────────────────────────────────────────────────────────
+  const [sessions, setSessions]     = useState([]);
+  const [streak, setStreak]         = useState(0);
+  const [activeTab, setActiveTab]   = useState("stats");
+
+  // ── Calendar ─────────────────────────────────────────────────────────────────
+  const [calYear, setCalYear]       = useState(new Date().getFullYear());
+  const [calMonth, setCalMonth]     = useState(new Date().getMonth());
+
+  // ── Landing / pricing ────────────────────────────────────────────────────────
+  const [billing, setBilling]         = useState("monthly");
   const [promoCode, setPromoCode]     = useState("");
   const [promoApplied, setPromoApplied] = useState(null);
   const [promoError, setPromoError]   = useState("");
-  const [quizAnswers, setQuizAnswers] = useState(null);
-  const [showQuiz, setShowQuiz]       = useState(false);
-  const [quizStep, setQuizStep]       = useState(0);
-  const [tempQuiz, setTempQuiz]       = useState({ sleep:3, stress:3, pressure:"no" });
   const [referralCode]                = useState(() => "EDGE" + Math.random().toString(36).substr(2,6).toUpperCase());
-  const [emergencyActive, setEmergencyActive] = useState(false);
   const [calcLoss, setCalcLoss]       = useState("");
   const [showCalcResult, setShowCalcResult] = useState(false);
 
-  const messagesEndRef = useRef(null);
-  const inputRef       = useRef(null);
+  // ── Session check on mount ───────────────────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
+      if (s) {
+        loadDashboard(s.access_token).then(() => setScreen("dashboard"));
+      }
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      if (!s) {
+        setScreen("landing");
+        setSessions([]);
+        setStreak(0);
+        setProfile({ name:"", experience:"", platform:"", instrument:"", challenges:[], phone:"", coachLanguage:"english" });
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
-  useEffect(()=>{ messagesEndRef.current?.scrollIntoView({behavior:"smooth"}); }, [messages]);
-
-  const enabledRules      = Object.entries(rules).filter(([,v])=>v.enabled);
-  const disciplineScore   = calcDisciplineScore(sessions, streak);
-  const totalPnl          = sessions.reduce((a,s)=>a+s.pnl, 0);
-  const disciplineRate    = sessions.length > 0 ? Math.round((sessions.filter(s=>s.rulesFollowed).length/sessions.length)*100) : 0;
-
-  const toggleRule   = (key) => setRules(prev=>({...prev,[key]:{...prev[key],enabled:!prev[key].enabled}}));
-  const setRuleValue = (key,val) => setRules(prev=>({...prev,[key]:{...prev[key],value:val}}));
-
-  const applyPromo = () => {
-    const code = promoCode.trim().toUpperCase();
-    if (VALID_PROMOS[code]) {
-      setPromoApplied(VALID_PROMOS[code]);
-      setSelectedPlan(VALID_PROMOS[code].plan);
-      setPromoError("");
-    } else {
-      setPromoError("Invalid promo code. Try FREE10.");
-      setPromoApplied(null);
-    }
-  };
-
-  const startCoach = async () => {
-    const ruleLines = enabledRules.map(([,v])=>`${v.icon} **${v.label}:** ${ruleValueDisplay(null,v)}`).join("\n");
-    const challengeCount = (profile.challenges||[]).length;
-    const topChallenge = (profile.challenges||[])[0] || "discipline";
-    setMessages([{
-      role:"assistant",
-      content:`${profile.name}. I've read everything.\n\nYou trade ${profile.instrument} on ${profile.platform}. ${profile.experience} of experience. And your biggest challenge${challengeCount > 1 ? "s" : ""}: **${(profile.challenges||[]).join(", ")}**.\n\nI know this about you — and I'm going to hold you to the version of yourself that set these rules:\n\n${ruleLines}\n\nThese don't bend. Not when you're up. Not when you're down. Especially not then.\n\n📱 Check your WhatsApp — your first message is there.\n\nBefore your next session, hit **Pre-Session Check** above. It takes 2 minutes and tells me how to coach you today.\n\nWhat's your biggest fear going into tomorrow's session?`,
-      time:formatTime12(),
-    }]);
+  const loadDashboard = async (accessToken) => {
     try {
-      const rulesPayload = {};
-      enabledRules.forEach(([k,v])=>{ rulesPayload[k]={label:v.label,value:v.value||v.defaultVal,icon:v.icon}; });
-      await fetch("https://edgemind-backend-production.up.railway.app/api/onboard", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({ phone:profile.phone, name:profile.name, experience:profile.experience, platform:profile.platform, instrument:profile.instrument, challenges:profile.challenges, coachLanguage:profile.coachLanguage||"english", rules:rulesPayload, plan:selectedPlan, promoCode:promoApplied?promoCode:"" }),
+      const res = await fetch(`${API_URL}/api/me`, {
+        headers: { "Authorization": `Bearer ${accessToken}` },
       });
-    } catch(e){ console.log("Onboard error",e); }
-    setScreen("success");
-  };
-
-  const sendMessage = async (overrideInput) => {
-    const msg = (overrideInput || input).trim();
-    if (!msg || loading) return;
-    const userMsg = { role:"user", content:msg, time:formatTime12() };
-    const newMsgs = [...messages, userMsg];
-    setMessages(newMsgs);
-    const lower = msg.toLowerCase();
-    if (lower.includes("done") && (lower.includes("made")||lower.includes("lost"))) {
-      const madeMatch = msg.match(/made \$?([\d,]+)/i);
-      const lostMatch = msg.match(/lost \$?([\d,]+)/i);
-      const rulesYes  = /rules?\s*:?\s*yes/i.test(msg);
-      const pnl = madeMatch ? parseInt(madeMatch[1].replace(/,/g,"")) : lostMatch ? -parseInt(lostMatch[1].replace(/,/g,"")) : 0;
-      setSessions(prev=>[...prev,{date:new Date().toLocaleDateString(),pnl,rulesFollowed:rulesYes,time:formatTime12()}]);
-      setStreak(s=>rulesYes?s+1:0);
-    }
-    setInput("");
-    setLoading(true);
-    try {
-      const res = await fetch("https://edgemind-backend-production.up.railway.app/api/chat", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({ profile, rules, quizAnswers, phone: profile.phone, messages:newMsgs.map(m=>({role:m.role,content:m.content})) }),
-      });
+      if (!res.ok) return;
       const data = await res.json();
-      setMessages(prev=>[...prev,{role:"assistant",content:data.reply||"I'm here. Keep going.",time:formatTime12()}]);
-    } catch {
-      setMessages(prev=>[...prev,{role:"assistant",content:"Connection issue. Your rules haven't changed.",time:formatTime12()}]);
+
+      if (data.profile) {
+        const p = Array.isArray(data.profile) ? data.profile[0] : data.profile;
+        setProfile({
+          name: p?.name || "",
+          experience: p?.experience || "",
+          platform: p?.platform || "",
+          instrument: p?.instrument || "",
+          challenges: p?.challenge ? p.challenge.split(", ") : [],
+          phone: data.phone || "",
+          coachLanguage: p?.coach_language || "english",
+        });
+      }
+
+      if (data.rules) {
+        const dbR = Array.isArray(data.rules) ? data.rules[0] : data.rules;
+        if (dbR) {
+          setRules(prev => {
+            const u = { ...prev };
+            if (dbR.profit_target)        { u.profitTarget      = { ...u.profitTarget,      value: String(dbR.profit_target),  enabled: true }; }
+            if (dbR.loss_limit)           { u.lossLimit         = { ...u.lossLimit,          value: String(dbR.loss_limit),     enabled: true }; }
+            if (dbR.session_start)        { u.sessionStart      = { ...u.sessionStart,        value: dbR.session_start,          enabled: true }; }
+            if (dbR.session_end)          { u.sessionEnd        = { ...u.sessionEnd,          value: dbR.session_end,            enabled: true }; }
+            if (dbR.max_trades_per_day)   { u.maxTrades         = { ...u.maxTrades,           value: String(dbR.max_trades_per_day), enabled: true }; }
+            if (dbR.no_add_to_loser)      { u.noAddToLoser      = { ...u.noAddToLoser,        enabled: true }; }
+            if (dbR.journal_required)     { u.journalRequired   = { ...u.journalRequired,     enabled: true }; }
+            if (dbR.weekly_review)        { u.weeklyReview      = { ...u.weeklyReview,        enabled: true }; }
+            if (dbR.celebrate_discipline) { u.celebrateDiscipline = { ...u.celebrateDiscipline, enabled: true }; }
+            if (dbR.custom_rule)          { u.customRule1       = { ...u.customRule1,         value: dbR.custom_rule, enabled: true }; }
+            return u;
+          });
+        }
+      }
+
+      if (data.sessions) {
+        setSessions(data.sessions.map(s => ({
+          ...s,
+          date: s.session_date,
+          pnl: s.pnl || 0,
+          rulesFollowed: s.rules_followed,
+        })));
+      }
+
+      if (data.stats) {
+        setStreak(data.stats.streak || 0);
+      }
+    } catch (e) {
+      console.error("Dashboard load failed:", e);
+    }
+  };
+
+  // ── Computed values ──────────────────────────────────────────────────────────
+  const enabledRules    = Object.entries(rules).filter(([, v]) => v.enabled);
+  const disciplineScore = calcDisciplineScore(sessions, streak);
+  const totalPnl        = sessions.reduce((a, s) => a + (s.pnl || 0), 0);
+  const disciplineRate  = sessions.length > 0 ? Math.round((sessions.filter(s => s.rulesFollowed).length / sessions.length) * 100) : 0;
+  const sc              = scoreColor(disciplineScore);
+
+  const chartData = useMemo(() => {
+    const sorted = [...sessions].sort((a, b) => new Date(a.session_date || a.date) - new Date(b.session_date || b.date));
+    let cum = 0;
+    return sorted.map(s => ({ date: (s.session_date || s.date || "").slice(5), cumPnl: (cum += (s.pnl || 0)) }));
+  }, [sessions]);
+
+  const sessionsByDate = useMemo(() => {
+    const map = {};
+    sessions.forEach(s => { const d = s.session_date || s.date; if (d) map[d] = s; });
+    return map;
+  }, [sessions]);
+
+  const calWeeks = useMemo(() => {
+    const firstDay = new Date(calYear, calMonth, 1);
+    const lastDay  = new Date(calYear, calMonth + 1, 0);
+    const weeks = [];
+    let week = Array(firstDay.getDay()).fill(null);
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+      week.push(new Date(calYear, calMonth, d));
+      if (week.length === 7) { weeks.push(week); week = []; }
+    }
+    if (week.length > 0) { while (week.length < 7) week.push(null); weeks.push(week); }
+    return weeks;
+  }, [calYear, calMonth]);
+
+  const goCalPrev = () => { if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); } else setCalMonth(m => m - 1); };
+  const goCalNext = () => { if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); } else setCalMonth(m => m + 1); };
+
+  // ── Auth handlers ────────────────────────────────────────────────────────────
+  const handleLogin = async () => {
+    if (!loginEmail.trim() || !loginPassword) { setAuthError("Please enter your email and password."); return; }
+    setLoading(true);
+    setAuthError("");
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail.trim(), password: loginPassword });
+      if (error) throw error;
+      setSession(data.session);
+      await loadDashboard(data.session.access_token);
+      setScreen("dashboard");
+    } catch (e) {
+      setAuthError(e.message || "Login failed. Check your email and password.");
     }
     setLoading(false);
   };
 
-  const triggerEmergencyStop = async () => {
-    setEmergencyActive(true);
-    await sendMessage("🚨 EMERGENCY STOP — I need to stop trading RIGHT NOW");
-    setTimeout(()=>setEmergencyActive(false), 3000);
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
   };
 
+  const handleForgotPassword = async () => {
+    if (!loginEmail.trim()) { setAuthError("Enter your email first."); return; }
+    await supabase.auth.resetPasswordForEmail(loginEmail.trim());
+    setAuthError("Password reset email sent. Check your inbox.");
+  };
+
+  // ── Rule helpers ─────────────────────────────────────────────────────────────
+  const toggleRule   = (key) => setRules(prev => ({ ...prev, [key]: { ...prev[key], enabled: !prev[key].enabled } }));
+  const setRuleValue = (key, val) => setRules(prev => ({ ...prev, [key]: { ...prev[key], value: val } }));
+
+  const applyPromo = () => {
+    const code = promoCode.trim().toUpperCase();
+    if (VALID_PROMOS[code]) { setPromoApplied(VALID_PROMOS[code]); setPromoError(""); }
+    else { setPromoError("Invalid promo code. Try FREE10."); setPromoApplied(null); }
+  };
+
+  // ── Start coach (onboarding final step) ──────────────────────────────────────
+  const startCoach = async () => {
+    setLoading(true);
+    setAuthError("");
+    try {
+      const { data: authData, error: authErr } = await supabase.auth.signUp({
+        email: accountEmail.trim(),
+        password: accountPassword,
+        options: { data: { phone: profile.phone, name: profile.name } },
+      });
+      if (authErr) throw authErr;
+
+      const rulesPayload = {};
+      enabledRules.forEach(([k, v]) => { rulesPayload[k] = { label: v.label, value: v.value || v.defaultVal, icon: v.icon }; });
+
+      await fetch(`${API_URL}/api/onboard`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: profile.phone,
+          email: accountEmail.trim(),
+          name: profile.name,
+          experience: profile.experience,
+          platform: profile.platform,
+          instrument: profile.instrument,
+          challenges: profile.challenges,
+          coachLanguage: profile.coachLanguage || "english",
+          rules: rulesPayload,
+          plan: "performance",
+          promoCode: promoApplied ? promoCode : "",
+          user_id: authData.user?.id,
+        }),
+      });
+
+      if (authData.session) setSession(authData.session);
+      setScreen("success");
+    } catch (e) {
+      setAuthError(e.message || "Account creation failed. Try again.");
+    }
+    setLoading(false);
+  };
+
+  // ── CSS ──────────────────────────────────────────────────────────────────────
   const CSS = `
     @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap');
     *{box-sizing:border-box;margin:0;padding:0;}
@@ -373,27 +447,17 @@ export default function App() {
     .up3{animation:up 0.5s 0.2s ease both;}
     @keyframes fade{from{opacity:0}to{opacity:1}}
     @keyframes up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-    .msg{animation:msg 0.25s ease forwards;}
-    @keyframes msg{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-    .dot{animation:blink 1.4s infinite;}
-    .score-ring{animation:spin 2s linear infinite;}
-    @keyframes spin{from{stroke-dashoffset:220}to{stroke-dashoffset:0}}
-    @keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
-    .rule-row:hover{background:#182818!important;}
-    .tab:hover{color:#00E676!important;}
-    .qbtn:hover{border-color:#00E67660!important;color:#00E676!important;}
-    .glow:hover{box-shadow:0 0 32px #00E67655;transform:translateY(-2px);}
-    .plan-card{transition:all 0.25s ease;cursor:pointer;}
+    .glow:hover{box-shadow:0 0 32px #00E67555;transform:translateY(-2px);}
+    .plan-card{transition:all 0.25s ease;}
     .plan-card:hover{transform:translateY(-4px);box-shadow:0 12px 40px #00E67612;}
     .lang-btn:hover{color:#00E676!important;border-color:#00E67660!important;}
     .cat-btn:hover{background:#182818!important;}
-    .send-btn:hover{opacity:0.9;}
-    .emergency-pulse{animation:pulse 1s ease-in-out infinite;}
-    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 #EF444460}50%{box-shadow:0 0 0 12px #EF444400}}
-    .testimonial-card{transition:all 0.2s ease;}
+    .rule-row:hover{background:#182818!important;}
+    .tab:hover{color:#00E676!important;}
     .testimonial-card:hover{border-color:#00E67640!important;transform:translateY(-2px);}
     .billing-toggle{background:#111C11;border-radius:8px;padding:3px;display:inline-flex;}
     .billing-btn{padding:6px 16px;border-radius:6px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.05em;transition:all 0.15s;}
+    .cal-day:hover{border-color:#00E67640!important;}
     input[type=range]{accent-color:#00E676;}
     input[type=time]::-webkit-calendar-picker-indicator{filter:invert(0.5);}
     select option{background:#0F150F;}
@@ -404,63 +468,61 @@ export default function App() {
 
   const inp = { width:"100%",padding:"10px 14px",background:"#0F150F",border:"1px solid #182818",borderRadius:8,color:"#D4F5D4",fontSize:14,fontFamily:"'DM Sans',sans-serif",transition:"border-color 0.2s" };
   const lbl = { display:"block",fontSize:11,color:"#4E8050",marginBottom:6,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase" };
+  const PLAN = { name:t.plan_name, price_mo:t.plan_price_mo, price_yr:t.plan_price_yr, per_mo:t.plan_per_mo, per_yr:t.plan_per_yr, desc:t.plan_desc, features:t.plan_features };
 
-  const PLAN = { id:"performance", name:t.plan_name, price_mo:t.plan_price_mo, price_yr:t.plan_price_yr, per_mo:t.plan_per_mo, per_yr:t.plan_per_yr, desc:t.plan_desc, features:t.plan_features, color:"#00E676" };
+  // ── Auth loading splash ───────────────────────────────────────────────────────
+  if (authLoading) return (
+    <div style={{ height:"100vh",background:"#080C08",display:"flex",alignItems:"center",justifyContent:"center" }}>
+      <style>{CSS}</style>
+      <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:"#00E676",letterSpacing:3 }}>EDGEMIND</div>
+    </div>
+  );
 
-  // ── PRE-SESSION QUIZ OVERLAY ──────────────────────────────────────────────
-  if (showQuiz) {
-    const quizQs = [
-      { q:"How did you sleep last night?", key:"sleep", type:"scale", min:"Terrible", max:"Great" },
-      { q:"What's your stress level right now?", key:"stress", type:"scale", min:"Calm", max:"Stressed" },
-      { q:"Any financial pressure driving you to trade today?", key:"pressure", type:"yesno" },
-    ];
-    const qq = quizQs[quizStep];
-    const isLast = quizStep === quizQs.length - 1;
-    return (
-      <div style={{ position:"fixed",inset:0,background:"#060C06ee",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:24 }}>
-        <style>{CSS}</style>
-        <div className="up" style={{ width:"100%",maxWidth:400,background:"#0F150F",border:"1px solid #182818",borderRadius:16,padding:32 }}>
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:"#4E8050",letterSpacing:2,marginBottom:8 }}>PRE-SESSION CHECK · {quizStep+1}/{quizQs.length}</div>
-          <h2 style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#F0FFF4",marginBottom:24,lineHeight:1.1 }}>{qq.q}</h2>
-          {qq.type==="scale" && (
-            <div>
-              <div style={{ display:"flex",justifyContent:"space-between",fontSize:11,color:"#3D6B3D",marginBottom:8 }}><span>{qq.min}</span><span>{qq.max}</span></div>
-              <input type="range" min="1" max="5" value={tempQuiz[qq.key]} onChange={e=>setTempQuiz({...tempQuiz,[qq.key]:parseInt(e.target.value)})} style={{ width:"100%",marginBottom:12 }} />
-              <div style={{ textAlign:"center",fontFamily:"'Bebas Neue',sans-serif",fontSize:36,color:"#00E676" }}>{tempQuiz[qq.key]}/5</div>
+  // ── Login screen ─────────────────────────────────────────────────────────────
+  if (screen === "login") return (
+    <div style={{ minHeight:"100vh",background:"#080C08",display:"flex",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'DM Sans',sans-serif" }}>
+      <style>{CSS}</style>
+      <div className="up" style={{ width:"100%",maxWidth:380 }}>
+        <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#00E676",letterSpacing:2,marginBottom:36,textAlign:"center" }}>EDGEMIND</div>
+        <h2 style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:34,color:"#F0FFF4",letterSpacing:1,marginBottom:6 }}>WELCOME BACK.</h2>
+        <p style={{ fontSize:13,color:"#3D6B3D",marginBottom:28,lineHeight:1.6 }}>Log in to your coaching dashboard.</p>
+
+        <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
+          <div>
+            <label style={lbl}>Email</label>
+            <input style={inp} type="email" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder="you@email.com" onKeyDown={e=>e.key==="Enter"&&handleLogin()} autoFocus />
+          </div>
+          <div>
+            <label style={lbl}>Password</label>
+            <input style={inp} type="password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&handleLogin()} />
+          </div>
+
+          {authError && (
+            <div style={{ fontSize:12,color:authError.includes("sent")?"#00E676":"#EF4444",padding:"8px 12px",background:authError.includes("sent")?"#00E67610":"#EF444410",borderRadius:6,border:`1px solid ${authError.includes("sent")?"#00E67630":"#EF444430"}` }}>
+              {authError}
             </div>
           )}
-          {qq.type==="yesno" && (
-            <div style={{ display:"flex",gap:12 }}>
-              {["yes","no"].map(v=>(
-                <button key={v} onClick={()=>setTempQuiz({...tempQuiz,pressure:v})} style={{ flex:1,padding:16,background:tempQuiz.pressure===v?"#00E67620":"transparent",border:`2px solid ${tempQuiz.pressure===v?"#00E676":"#182818"}`,borderRadius:10,color:tempQuiz.pressure===v?"#00E676":"#3D6B3D",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,letterSpacing:1,cursor:"pointer",transition:"all 0.15s" }}>
-                  {v.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          )}
-          <div style={{ display:"flex",gap:10,marginTop:24 }}>
-            {quizStep > 0 && <button onClick={()=>setQuizStep(s=>s-1)} style={{ padding:"10px 18px",background:"transparent",border:"1px solid #182818",borderRadius:8,color:"#3D6B3D",cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,fontSize:13 }}>← BACK</button>}
-            <button onClick={()=>{
-              if (!isLast) { setQuizStep(s=>s+1); }
-              else {
-                setQuizAnswers(tempQuiz);
-                setShowQuiz(false);
-                const warn = tempQuiz.sleep<=2 || tempQuiz.stress>=4 || tempQuiz.pressure==="yes";
-                const warnMsg = warn
-                  ? `Quiz complete. I have to be honest with you, ${profile.name} — I'm a little concerned about your state today.\n\n${tempQuiz.sleep<=2?"🔴 **Poor sleep** impairs the prefrontal cortex — the part that enforces your rules.\n":""}${tempQuiz.stress>=4?"🔴 **High stress** means your emotional brain is running the show right now.\n":""}${tempQuiz.pressure==="yes"?"🔴 **Financial pressure** is the #1 cause of revenge trading.\n":""}\nYou CAN trade today — but your rules are now more important than ever. What's your plan if you hit your loss limit in the first 30 minutes?`
-                  : `Pre-session check complete. Sleep: ${tempQuiz.sleep}/5 · Stress: ${tempQuiz.stress}/5 · Pressure: ${tempQuiz.pressure}.\n\nYou're in a solid state today, ${profile.name}. Trust your rules, execute your edge, and close the platform the moment you hit your target.\n\nWhat time is your session starting today?`;
-                setMessages(prev=>[...prev,{role:"assistant",content:warnMsg,time:formatTime12()}]);
-              }
-            }} className="glow" style={{ flex:1,padding:12,background:"#00E676",border:"none",borderRadius:8,color:"#080C08",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,transition:"all 0.2s" }}>
-              {isLast?"SUBMIT →":"NEXT →"}
+
+          <button onClick={handleLogin} disabled={loading} className="glow" style={{ padding:"14px",background:"#00E676",border:"none",borderRadius:8,color:"#080C08",fontWeight:800,fontSize:14,cursor:loading?"not-allowed":"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2,transition:"all 0.2s",opacity:loading?0.7:1 }}>
+            {loading ? "LOGGING IN..." : "LOG IN →"}
+          </button>
+
+          <button onClick={handleForgotPassword} style={{ background:"transparent",border:"none",color:"#2D4A2D",fontSize:12,cursor:"pointer",textDecoration:"underline",padding:0,textAlign:"center" }}>
+            Forgot password?
+          </button>
+
+          <div style={{ borderTop:"1px solid #182818",paddingTop:16,textAlign:"center" }}>
+            <span style={{ fontSize:13,color:"#2D4A2D" }}>New here? </span>
+            <button onClick={()=>setScreen("onboarding")} style={{ background:"transparent",border:"none",color:"#00E676",fontSize:13,cursor:"pointer",fontWeight:700 }}>
+              Start free trial →
             </button>
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 
-  // ── LANDING ───────────────────────────────────────────────────────────────
+  // ── Landing ───────────────────────────────────────────────────────────────────
   if (screen === "landing") return (
     <div style={{ minHeight:"100vh",background:"#080C08",fontFamily:"'DM Sans',sans-serif",color:"#D4F5D4" }}>
       <style>{CSS}</style>
@@ -477,6 +539,7 @@ export default function App() {
             <div style={{ width:6,height:6,borderRadius:"50%",background:"#00E676",animation:"blink 1.4s infinite" }} />
             <span style={{ fontSize:11,color:"#4E8050",fontWeight:600 }}>{ACTIVE_TRADERS.toLocaleString()} traders active</span>
           </div>
+          <button onClick={()=>setScreen("login")} style={{ padding:"9px 18px",background:"transparent",border:"1px solid #1E3020",borderRadius:6,color:"#3D6B3D",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,transition:"all 0.15s" }}>LOG IN</button>
           <button onClick={()=>setScreen("onboarding")} className="glow" style={{ padding:"9px 22px",background:"#00E676",border:"none",borderRadius:6,color:"#080C08",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,transition:"all 0.2s" }}>
             {t.nav_cta}
           </button>
@@ -499,7 +562,6 @@ export default function App() {
           </button>
           <div style={{ fontSize:12,color:"#1A301A" }}>{t.hero_trial}</div>
 
-          {/* Stats */}
           <div className="up3" style={{ display:"flex",gap:48,justifyContent:"center",marginTop:72,flexWrap:"wrap" }}>
             {[[t.stat1_v,t.stat1_d],[t.stat2_v,t.stat2_d],[t.stat3_v,t.stat3_d]].map(([v,d])=>(
               <div key={v} style={{ textAlign:"center" }}>
@@ -515,7 +577,7 @@ export default function App() {
       <div style={{ maxWidth:640,margin:"0 auto 60px",padding:"0 24px" }}>
         <div style={{ background:"#0F150F",border:"1px solid #182818",borderRadius:16,padding:"28px 28px 24px" }}>
           <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:"#F0FFF4",letterSpacing:1,marginBottom:4 }}>💸 WHAT YOUR RULE BREAKS ARE REALLY COSTING YOU</div>
-          <p style={{ fontSize:13,color:"#3D6B3D",marginBottom:20,lineHeight:1.6 }}>How much have undisciplined trading decisions cost you in the last 30 days? Be honest.</p>
+          <p style={{ fontSize:13,color:"#3D6B3D",marginBottom:20,lineHeight:1.6 }}>How much have undisciplined trading decisions cost you in the last 30 days?</p>
           <div style={{ display:"flex",gap:10,alignItems:"center",marginBottom:16 }}>
             <span style={{ color:"#4E8050",fontSize:18,fontWeight:700 }}>$</span>
             <input style={{ ...inp,fontSize:20,fontWeight:700 }} type="number" value={calcLoss} onChange={e=>{setCalcLoss(e.target.value);setShowCalcResult(false);}} placeholder="e.g. 1500" />
@@ -531,16 +593,13 @@ export default function App() {
                 </div>
                 <div style={{ textAlign:"center",padding:"10px",background:"#00E67608",border:"1px solid #00E67620",borderRadius:8 }}>
                   <div style={{ fontSize:11,color:"#00E676",fontWeight:700,marginBottom:4 }}>EDGEMIND COST</div>
-                  <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:"#00E676" }}>$29</div>
-                  <div style={{ fontSize:10,color:"#1A3020" }}>Performance plan/mo</div>
+                  <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:"#00E676" }}>$49</div>
+                  <div style={{ fontSize:10,color:"#1A3020" }}>per month</div>
                 </div>
               </div>
               <div style={{ textAlign:"center",padding:"12px",background:"#00E67610",borderRadius:8 }}>
                 <div style={{ fontSize:13,color:"#00E676",fontWeight:700 }}>
-                  EdgeMind coaching costs {Math.round((parseInt(calcLoss)/49)*10)/10}x LESS than your rule breaks.
-                </div>
-                <div style={{ fontSize:11,color:"#3D6B3D",marginTop:4 }}>
-                  Preventing just one revenge trade per week pays for your entire coaching plan — {Math.round(parseInt(calcLoss)/49)}× over.
+                  EdgeMind costs {Math.round((parseInt(calcLoss)/49)*10)/10}× LESS than your rule breaks.
                 </div>
               </div>
               <button onClick={()=>setScreen("onboarding")} className="glow" style={{ width:"100%",marginTop:12,padding:"11px",background:"#00E676",border:"none",borderRadius:8,color:"#080C08",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,transition:"all 0.2s" }}>
@@ -566,11 +625,10 @@ export default function App() {
       <div style={{ maxWidth:960,margin:"0 auto 80px",padding:"0 24px" }}>
         <div style={{ textAlign:"center",marginBottom:32 }}>
           <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:"clamp(28px,5vw,48px)",color:"#F0FFF4",letterSpacing:2,marginBottom:6 }}>WHAT TRADERS SAY AFTER 30 DAYS.</div>
-          <div style={{ fontSize:13,color:"#3D6B3D" }}>The same coaching frameworks used by professional traders. Now available to you.</div>
         </div>
         <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16 }}>
           {TESTIMONIALS.map(tm=>(
-            <div key={tm.name} className="testimonial-card" style={{ padding:"20px",background:"#0F150F",border:"1px solid #182818",borderRadius:12 }}>
+            <div key={tm.name} className="testimonial-card" style={{ padding:"20px",background:"#0F150F",border:"1px solid #182818",borderRadius:12,transition:"all 0.2s ease" }}>
               <div style={{ display:"flex",gap:10,alignItems:"center",marginBottom:14 }}>
                 <div style={{ width:36,height:36,borderRadius:8,background:"#00E67618",border:"1px solid #00E67630",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#00E676",flexShrink:0 }}>{tm.avatar}</div>
                 <div>
@@ -592,8 +650,6 @@ export default function App() {
           <div style={{ textAlign:"center",marginBottom:36 }}>
             <h2 style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:"clamp(36px,6vw,64px)",color:"#F0FFF4",letterSpacing:2,marginBottom:8 }}>{t.pricing_title}</h2>
             <p style={{ fontSize:15,color:"#3D6B3D",marginBottom:24 }}>{t.pricing_sub}</p>
-
-            {/* Billing toggle */}
             <div className="billing-toggle">
               <button className="billing-btn" onClick={()=>setBilling("monthly")} style={{ background:billing==="monthly"?"#182818":"transparent",color:billing==="monthly"?"#00E676":"#3D6B3D" }}>{t.billing_mo}</button>
               <button className="billing-btn" onClick={()=>setBilling("annual")} style={{ background:billing==="annual"?"#182818":"transparent",color:billing==="annual"?"#00E676":"#3D6B3D",display:"flex",alignItems:"center",gap:6 }}>
@@ -603,48 +659,35 @@ export default function App() {
             </div>
           </div>
 
-          {/* Promo code */}
           <div style={{ maxWidth:400,margin:"0 auto 32px",display:"flex",gap:8 }}>
             <input style={{ ...inp,fontSize:13 }} placeholder="Promo code (e.g. FREE10)" value={promoCode} onChange={e=>{setPromoCode(e.target.value);setPromoError("");}} onKeyDown={e=>e.key==="Enter"&&applyPromo()} />
-            <button onClick={applyPromo} style={{ padding:"10px 18px",background:"transparent",border:"1px solid #182818",borderRadius:8,color:"#4E8050",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,whiteSpace:"nowrap",transition:"all 0.15s" }}>APPLY</button>
+            <button onClick={applyPromo} style={{ padding:"10px 18px",background:"transparent",border:"1px solid #182818",borderRadius:8,color:"#4E8050",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,whiteSpace:"nowrap" }}>APPLY</button>
           </div>
-          {promoApplied && <div style={{ textAlign:"center",marginBottom:20,padding:"8px 16px",background:"#00E67615",border:"1px solid #00E67630",borderRadius:8,fontSize:13,color:"#00E676",fontWeight:700,display:"inline-block",width:"100%",maxWidth:400,margin:"0 auto 24px" }}>🎉 {promoApplied.label} applied!</div>}
+          {promoApplied && <div style={{ textAlign:"center",marginBottom:20,padding:"8px 16px",background:"#00E67615",border:"1px solid #00E67630",borderRadius:8,fontSize:13,color:"#00E676",fontWeight:700,maxWidth:400,margin:"0 auto 24px" }}>🎉 {promoApplied.label} applied!</div>}
           {promoError && <div style={{ textAlign:"center",marginBottom:20,color:"#EF4444",fontSize:12 }}>{promoError}</div>}
 
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:20 }}>
-            {/* ── SINGLE PLAN CARD ── */}
-            <div style={{ maxWidth:480,margin:"0 auto",width:"100%" }}>
-              <div className="plan-card" style={{ padding:"36px 32px",background:"#0F150F",border:"2px solid #00E676",borderRadius:20,position:"relative" }}>
-                <div style={{ position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",padding:"4px 18px",background:"#00E676",borderRadius:20,fontSize:11,color:"#080C08",fontWeight:800,letterSpacing:"0.08em",whiteSpace:"nowrap" }}>FULL COACHING ACCESS</div>
-                <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#00E676",letterSpacing:3,marginBottom:16,textAlign:"center" }}>{PLAN.name}</div>
-                <div style={{ textAlign:"center",marginBottom:8 }}>
-                  <span style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:64,color:"#F0FFF4",letterSpacing:1 }}>{billing==="annual"?"$34":"$49"}</span>
-                  <span style={{ fontSize:14,color:"#3D6B3D",marginLeft:4 }}>{billing==="annual"?"/mo (billed $409/yr)":"/month"}</span>
-                </div>
-                {billing==="annual" && (
-                  <div style={{ textAlign:"center",marginBottom:16 }}>
-                    <span style={{ background:"#00E67622",color:"#00E676",padding:"4px 14px",borderRadius:20,fontSize:11,fontWeight:800,letterSpacing:"0.08em" }}>{t.plan_save}</span>
-                  </div>
-                )}
-                {billing==="monthly" && (
-                  <div style={{ textAlign:"center",marginBottom:16 }}>
-                    <span style={{ color:"#3D6B3D",fontSize:12 }}>Or save $179/year with annual billing ↑</span>
-                  </div>
-                )}
-                <p style={{ fontSize:13,color:"#3D6B3D",textAlign:"center",marginBottom:24,lineHeight:1.6 }}>{PLAN.desc}</p>
-                <div style={{ marginBottom:28 }}>
-                  {PLAN.features.map((f,i)=>(
-                    <div key={i} style={{ display:"flex",alignItems:"flex-start",gap:10,marginBottom:10 }}>
-                      <span style={{ color:"#00E676",fontSize:14,marginTop:1,flexShrink:0 }}>✓</span>
-                      <span style={{ fontSize:13,color:"#8FAF8F",lineHeight:1.5 }}>{f}</span>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={()=>setScreen("onboarding")} className="glow" style={{ width:"100%",padding:"16px",background:"#00E676",border:"none",borderRadius:10,color:"#080C08",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1.5,transition:"all 0.2s" }}>
-                  {promoApplied?"🎉 CLAIM FREE ACCESS →":t.plan_cta}
-                </button>
-                <div style={{ textAlign:"center",marginTop:12,fontSize:11,color:"#3D6B3D" }}>{t.plan_trial}</div>
+          <div style={{ maxWidth:480,margin:"0 auto" }}>
+            <div className="plan-card" style={{ padding:"36px 32px",background:"#0F150F",border:"2px solid #00E676",borderRadius:20,position:"relative" }}>
+              <div style={{ position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",padding:"4px 18px",background:"#00E676",borderRadius:20,fontSize:11,color:"#080C08",fontWeight:800,letterSpacing:"0.08em",whiteSpace:"nowrap" }}>FULL COACHING ACCESS</div>
+              <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#00E676",letterSpacing:3,marginBottom:16,textAlign:"center" }}>{PLAN.name}</div>
+              <div style={{ textAlign:"center",marginBottom:8 }}>
+                <span style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:64,color:"#F0FFF4",letterSpacing:1 }}>{billing==="annual"?"$34":"$49"}</span>
+                <span style={{ fontSize:14,color:"#3D6B3D",marginLeft:4 }}>{billing==="annual"?"/mo (billed $409/yr)":"/month"}</span>
               </div>
+              {billing==="annual" && <div style={{ textAlign:"center",marginBottom:16 }}><span style={{ background:"#00E67622",color:"#00E676",padding:"4px 14px",borderRadius:20,fontSize:11,fontWeight:800 }}>{t.plan_save}</span></div>}
+              <p style={{ fontSize:13,color:"#3D6B3D",textAlign:"center",marginBottom:24,lineHeight:1.6 }}>{PLAN.desc}</p>
+              <div style={{ marginBottom:28 }}>
+                {PLAN.features.map((f,i)=>(
+                  <div key={i} style={{ display:"flex",alignItems:"flex-start",gap:10,marginBottom:10 }}>
+                    <span style={{ color:"#00E676",fontSize:14,marginTop:1,flexShrink:0 }}>✓</span>
+                    <span style={{ fontSize:13,color:"#8FAF8F",lineHeight:1.5 }}>{f}</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={()=>setScreen("onboarding")} className="glow" style={{ width:"100%",padding:"16px",background:"#00E676",border:"none",borderRadius:10,color:"#080C08",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1.5,transition:"all 0.2s" }}>
+                {promoApplied?"🎉 CLAIM FREE ACCESS →":t.plan_cta}
+              </button>
+              <div style={{ textAlign:"center",marginTop:12,fontSize:11,color:"#3D6B3D" }}>{t.plan_trial}</div>
             </div>
           </div>
         </div>
@@ -652,13 +695,15 @@ export default function App() {
     </div>
   );
 
-  // ── ONBOARDING ──────────────────────────────────────────────────────────────
+  // ── Onboarding ────────────────────────────────────────────────────────────────
+  const accountValid = accountEmail.includes("@") && accountPassword.length >= 8 && accountPassword === accountConfirmPw;
+
   const onboarding = [
     {
-      title:"WHO ARE YOU AS A TRADER?",
-      sub:"Your coach needs to know you before it can help you.",
-      valid:profile.name && profile.experience && profile.platform && profile.instrument && profile.phone,
-      content:(
+      title: "WHO ARE YOU AS A TRADER?",
+      sub: "Your coach needs to know you before it can help you.",
+      valid: !!(profile.name && profile.experience && profile.platform && profile.instrument && profile.phone),
+      content: (
         <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
           <div><label style={lbl}>Your Name</label><input style={inp} value={profile.name} onChange={e=>setProfile({...profile,name:e.target.value})} placeholder="First name"/></div>
           <div><label style={lbl}>WhatsApp Number (with country code)</label><input style={inp} value={profile.phone} onChange={e=>setProfile({...profile,phone:e.target.value})} placeholder="+1 555 123 4567"/></div>
@@ -666,8 +711,7 @@ export default function App() {
             <label style={lbl}>Coach Language</label>
             <div style={{ display:"flex",gap:8,marginTop:4 }}>
               {[["english","🇺🇸 English"],["spanish","🇪🇸 Spanish"],["portuguese","🇧🇷 Portuguese"]].map(([val,label])=>(
-                <button key={val} onClick={()=>setProfile({...profile,coachLanguage:val})}
-                  style={{ flex:1,padding:"10px 8px",background:profile.coachLanguage===val?"#00E676":"#0F150F",border:`1px solid ${profile.coachLanguage===val?"#00E676":"#182818"}`,borderRadius:8,color:profile.coachLanguage===val?"#080C08":"#3D6B3D",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",transition:"all 0.15s" }}>
+                <button key={val} onClick={()=>setProfile({...profile,coachLanguage:val})} style={{ flex:1,padding:"10px 8px",background:profile.coachLanguage===val?"#00E676":"#0F150F",border:`1px solid ${profile.coachLanguage===val?"#00E676":"#182818"}`,borderRadius:8,color:profile.coachLanguage===val?"#080C08":"#3D6B3D",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",transition:"all 0.15s" }}>
                   {label}
                 </button>
               ))}
@@ -690,25 +734,21 @@ export default function App() {
               </select>
             </div>
           </div>
-          <div style={{ padding:"10px 14px",background:"#00E67608",border:"1px solid #00E67620",borderRadius:8,fontSize:12,color:"#3D6B3D" }}>
-            Selected: <strong style={{ color:"#00E676" }}>{PLAN.name} · {billing==="annual"?PLAN.price_yr+"/yr":PLAN.price_mo+"/mo"}</strong>
-            {promoApplied && <span style={{ color:"#00E676",marginLeft:8 }}>🎉 {promoApplied.label}</span>}
-          </div>
         </div>
       ),
     },
     {
-      title:"YOUR BIGGEST CHALLENGE.",
-      sub:"Honesty here is everything. This is what your coach will focus on.",
-      valid:profile.challenges && profile.challenges.length > 0,
-      content:(
+      title: "YOUR BIGGEST CHALLENGE.",
+      sub: "Honesty here is everything. This is what your coach will focus on.",
+      valid: !!(profile.challenges && profile.challenges.length > 0),
+      content: (
         <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
           <div style={{ fontSize:11,color:"#00E676",marginBottom:4,fontWeight:600,letterSpacing:"0.06em" }}>SELECT ALL THAT APPLY</div>
           {CHALLENGES.map(c=>{
             const selected = (profile.challenges||[]).includes(c);
             return (
               <button key={c} onClick={()=>{
-                const prev=profile.challenges||[];
+                const prev = profile.challenges||[];
                 setProfile({...profile,challenges:prev.includes(c)?prev.filter(x=>x!==c):[...prev,c]});
               }} style={{ padding:"13px 16px",textAlign:"left",background:selected?"#00E67612":"#0F150F",border:`1px solid ${selected?"#00E676":"#182818"}`,borderRadius:8,color:selected?"#00E676":"#3D6B3D",fontSize:14,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",transition:"all 0.15s",display:"flex",alignItems:"center",gap:10 }}>
                 <span style={{ width:16,height:16,borderRadius:3,border:`2px solid ${selected?"#00E676":"#2D4A2D"}`,background:selected?"#00E676":"transparent",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#080C08",fontWeight:800,flexShrink:0 }}>{selected?"✓":""}</span>
@@ -720,10 +760,10 @@ export default function App() {
       ),
     },
     {
-      title:"BUILD YOUR RULE SYSTEM.",
-      sub:"Turn on the rules that apply to you. Set your numbers. These are non-negotiable.",
-      valid:rules.profitTarget.enabled && rules.lossLimit.enabled && rules.sessionStart.enabled && rules.sessionEnd.enabled,
-      content:(
+      title: "BUILD YOUR RULE SYSTEM.",
+      sub: "Turn on the rules that apply to you. Set your numbers. These are non-negotiable.",
+      valid: !!(rules.profitTarget.enabled && rules.lossLimit.enabled && rules.sessionStart.enabled && rules.sessionEnd.enabled),
+      content: (
         <div>
           {CATEGORIES.map(cat=>(
             <div key={cat.id} style={{ marginBottom:10 }}>
@@ -748,10 +788,10 @@ export default function App() {
                             <span style={{ fontSize:13,color:"#D4F5D4",fontWeight:600 }}>{rule.label}</span>
                           </div>
                           <div style={{ fontSize:11,color:"#2D4A2D",lineHeight:1.5,marginBottom:rule.enabled&&rule.type!=="toggle"?10:0 }}>{rule.desc}</div>
-                          {rule.enabled && rule.type==="dollar" && <div style={{ display:"flex",alignItems:"center",gap:8,marginTop:8 }}><span style={{ color:"#3D6B3D",fontSize:13 }}>$</span><input style={{ ...inp,width:120,padding:"6px 10px",fontSize:13 }} type="number" value={rule.value} onChange={e=>setRuleValue(key,e.target.value)} placeholder={rule.defaultVal}/></div>}
-                          {rule.enabled && rule.type==="time" && <input style={{ ...inp,width:130,padding:"6px 10px",fontSize:13,marginTop:8 }} type="time" value={rule.value} onChange={e=>setRuleValue(key,e.target.value)}/>}
-                          {rule.enabled && rule.type==="number" && <input style={{ ...inp,width:120,padding:"6px 10px",fontSize:13,marginTop:8 }} type="number" value={rule.value} onChange={e=>setRuleValue(key,e.target.value)} placeholder={rule.defaultVal}/>}
-                          {rule.enabled && rule.type==="text" && <input style={{ ...inp,width:"100%",padding:"6px 10px",fontSize:13,marginTop:8 }} type="text" value={rule.value} onChange={e=>setRuleValue(key,e.target.value)} placeholder="Write your rule in your own words..."/>}
+                          {rule.enabled && rule.type==="dollar"  && <div style={{ display:"flex",alignItems:"center",gap:8,marginTop:8 }}><span style={{ color:"#3D6B3D",fontSize:13 }}>$</span><input style={{ ...inp,width:120,padding:"6px 10px",fontSize:13 }} type="number" value={rule.value} onChange={e=>setRuleValue(key,e.target.value)} placeholder={rule.defaultVal}/></div>}
+                          {rule.enabled && rule.type==="time"    && <input style={{ ...inp,width:130,padding:"6px 10px",fontSize:13,marginTop:8 }} type="time" value={rule.value} onChange={e=>setRuleValue(key,e.target.value)}/>}
+                          {rule.enabled && rule.type==="number"  && <input style={{ ...inp,width:120,padding:"6px 10px",fontSize:13,marginTop:8 }} type="number" value={rule.value} onChange={e=>setRuleValue(key,e.target.value)} placeholder={rule.defaultVal}/>}
+                          {rule.enabled && rule.type==="text"    && <input style={{ ...inp,width:"100%",padding:"6px 10px",fontSize:13,marginTop:8 }} type="text" value={rule.value} onChange={e=>setRuleValue(key,e.target.value)} placeholder="Write your rule in your own words..."/>}
                         </div>
                       </div>
                     </div>
@@ -767,10 +807,43 @@ export default function App() {
       ),
     },
     {
-      title:"YOUR COMMITMENT.",
-      sub:"Read this. Mean it. Then begin.",
-      valid:true,
-      content:(
+      title: "CREATE YOUR ACCOUNT.",
+      sub: "Your coaching dashboard, session history, and discipline score — all in one place.",
+      valid: accountValid,
+      content: (
+        <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
+          <div style={{ padding:"14px 16px",background:"#00E67608",border:"1px solid #00E67620",borderRadius:10,fontSize:13,color:"#3D6B3D",lineHeight:1.6 }}>
+            You're almost in. Create your account to access your personal coaching dashboard after every session.
+          </div>
+          <div>
+            <label style={lbl}>Email</label>
+            <input style={inp} type="email" value={accountEmail} onChange={e=>setAccountEmail(e.target.value)} placeholder="you@email.com" autoComplete="email"/>
+          </div>
+          <div>
+            <label style={lbl}>Password (min 8 characters)</label>
+            <input style={inp} type="password" value={accountPassword} onChange={e=>setAccountPassword(e.target.value)} placeholder="••••••••" autoComplete="new-password"/>
+          </div>
+          <div>
+            <label style={lbl}>Confirm Password</label>
+            <input style={inp} type="password" value={accountConfirmPw} onChange={e=>setAccountConfirmPw(e.target.value)} placeholder="••••••••" autoComplete="new-password"/>
+          </div>
+          {accountPassword && accountConfirmPw && accountPassword !== accountConfirmPw && (
+            <div style={{ fontSize:12,color:"#EF4444" }}>Passwords do not match.</div>
+          )}
+          {accountPassword && accountPassword.length < 8 && (
+            <div style={{ fontSize:12,color:"#FB923C" }}>Password must be at least 8 characters.</div>
+          )}
+          {authError && (
+            <div style={{ fontSize:12,color:"#EF4444",padding:"8px 12px",background:"#EF444410",borderRadius:6,border:"1px solid #EF444430" }}>{authError}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: "YOUR COMMITMENT.",
+      sub: "Read this. Mean it. Then begin.",
+      valid: true,
+      content: (
         <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
           <div style={{ padding:"20px",background:"#0F150F",border:"1px solid #182818",borderRadius:10,lineHeight:1.9,fontSize:14,color:"#7AAF7A" }}>
             I, <strong style={{ color:"#00E676" }}>{profile.name}</strong>, understand that the market is not my enemy.<br/>
@@ -786,7 +859,7 @@ export default function App() {
                 <span style={{ fontSize:13,color:"#00E676",fontWeight:700 }}>{ruleValueDisplay(key,rule)}</span>
               </div>
             ))}
-            {enabledRules.length>6 && <div style={{ fontSize:11,color:"#2D4A2D",textAlign:"center" }}>+{enabledRules.length-6} more rules active</div>}
+            {enabledRules.length > 6 && <div style={{ fontSize:11,color:"#2D4A2D",textAlign:"center" }}>+{enabledRules.length-6} more rules active</div>}
           </div>
         </div>
       ),
@@ -806,11 +879,16 @@ export default function App() {
           <div style={{ fontSize:11,color:"#2D4A2D",marginBottom:6,fontWeight:700,letterSpacing:"0.1em" }}>STEP {step+1} OF {onboarding.length}</div>
           <h2 style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:"#F0FFF4",marginBottom:6,letterSpacing:1,lineHeight:1 }}>{s.title}</h2>
           <p style={{ fontSize:13,color:"#3D6B3D",marginBottom:24,lineHeight:1.6 }}>{s.sub}</p>
-          <div style={{ maxHeight:"50vh",overflowY:"auto",paddingRight:4 }}>{s.content}</div>
+          <div style={{ maxHeight:"52vh",overflowY:"auto",paddingRight:4 }}>{s.content}</div>
           <div style={{ display:"flex",gap:10,marginTop:24 }}>
-            {step>0 && <button onClick={()=>setStep(s=>s-1)} style={{ flex:1,padding:13,background:"transparent",border:"1px solid #182818",borderRadius:8,color:"#3D6B3D",cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,fontSize:14 }}>← BACK</button>}
-            <button onClick={()=>step<onboarding.length-1?setStep(s=>s+1):startCoach()} disabled={!s.valid} className={s.valid?"glow":""} style={{ flex:2,padding:13,background:s.valid?"#00E676":"#182818",border:"none",borderRadius:8,color:s.valid?"#080C08":"#2D4A2D",fontWeight:800,fontSize:15,cursor:s.valid?"pointer":"not-allowed",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2,transition:"all 0.2s" }}>
-              {step<onboarding.length-1?"CONTINUE →":"BEGIN MY JOURNEY →"}
+            {step > 0 && <button onClick={()=>setStep(s=>s-1)} style={{ flex:1,padding:13,background:"transparent",border:"1px solid #182818",borderRadius:8,color:"#3D6B3D",cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,fontSize:14 }}>← BACK</button>}
+            <button
+              onClick={()=>step < onboarding.length-1 ? setStep(s=>s+1) : startCoach()}
+              disabled={!s.valid || loading}
+              className={s.valid&&!loading?"glow":""}
+              style={{ flex:2,padding:13,background:s.valid&&!loading?"#00E676":"#182818",border:"none",borderRadius:8,color:s.valid&&!loading?"#080C08":"#2D4A2D",fontWeight:800,fontSize:15,cursor:s.valid&&!loading?"pointer":"not-allowed",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:2,transition:"all 0.2s" }}
+            >
+              {loading ? "CREATING ACCOUNT..." : step < onboarding.length-1 ? "CONTINUE →" : "BEGIN MY JOURNEY →"}
             </button>
           </div>
         </div>
@@ -818,7 +896,7 @@ export default function App() {
     );
   }
 
-  // ── SUCCESS SCREEN ──────────────────────────────────────────────────────────
+  // ── Success ───────────────────────────────────────────────────────────────────
   if (screen === "success") return (
     <div style={{ minHeight:"100vh",background:"#080C08",display:"flex",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'DM Sans',sans-serif" }}>
       <style>{CSS}</style>
@@ -827,7 +905,6 @@ export default function App() {
         <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:36,color:"#F0FFF4",letterSpacing:1,marginBottom:4 }}>YOU'RE IN.</div>
         <p style={{ fontSize:13,color:"#3D6B3D",marginBottom:32 }}>Welcome to the disciplined side of trading, {profile.name}.</p>
 
-        {/* Activate WhatsApp */}
         <div style={{ padding:"20px 24px",background:"#00E67615",border:"2px solid #00E676",borderRadius:12,marginBottom:16,textAlign:"left" }}>
           <div style={{ fontSize:11,color:"#00E676",fontWeight:700,letterSpacing:"0.08em",marginBottom:8 }}>⚡ STEP 1 — ACTIVATE YOUR COACH NOW</div>
           <p style={{ fontSize:13,color:"#D4F5D4",lineHeight:1.7,marginBottom:12 }}>
@@ -841,26 +918,24 @@ export default function App() {
           </a>
         </div>
 
-        {/* Referral */}
         <div style={{ padding:"16px 20px",background:"#0F150F",border:"1px solid #182818",borderRadius:12,marginBottom:16,textAlign:"left" }}>
           <div style={{ fontSize:11,color:"#00E676",fontWeight:700,letterSpacing:"0.08em",marginBottom:8 }}>🎁 GIVE A FRIEND 1 FREE MONTH</div>
           <p style={{ fontSize:12,color:"#3D6B3D",marginBottom:10,lineHeight:1.6 }}>Share your code. They get their first month free. You get your next month free.</p>
           <div style={{ display:"flex",gap:8,alignItems:"center" }}>
             <div style={{ flex:1,padding:"10px 14px",background:"#080C08",border:"1px solid #00E67620",borderRadius:8,fontFamily:"monospace",fontSize:15,color:"#00E676",fontWeight:700,textAlign:"center",letterSpacing:2 }}>{referralCode}</div>
-            <button onClick={()=>navigator.clipboard.writeText(referralCode)} style={{ padding:"10px 14px",background:"transparent",border:"1px solid #182818",borderRadius:8,color:"#4E8050",fontSize:12,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,transition:"all 0.15s" }}>COPY</button>
+            <button onClick={()=>navigator.clipboard.writeText(referralCode)} style={{ padding:"10px 14px",background:"transparent",border:"1px solid #182818",borderRadius:8,color:"#4E8050",fontSize:12,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1 }}>COPY</button>
           </div>
         </div>
 
-        <button onClick={()=>setScreen("dashboard")} style={{ padding:"12px 32px",background:"transparent",border:"1px solid #182818",borderRadius:8,color:"#2D4A2D",fontSize:13,cursor:"pointer",fontFamily:"'DM Sans',sans-serif" }}>
-          View Dashboard →
+        <button onClick={()=>setScreen("dashboard")} className="glow" style={{ padding:"12px 32px",background:"#00E676",border:"none",borderRadius:8,color:"#080C08",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,transition:"all 0.2s" }}>
+          VIEW MY DASHBOARD →
         </button>
       </div>
     </div>
   );
 
-  // ── DASHBOARD ───────────────────────────────────────────────────────────────
-  const TABS = [["coach","🎯 Coach"],["stats","📊 Stats"],["rules","📋 Rules"]];
-  const sc = scoreColor(disciplineScore);
+  // ── Dashboard ─────────────────────────────────────────────────────────────────
+  const TABS = [["stats","📊 Stats"],["rules","📋 Rules"]];
 
   return (
     <div style={{ height:"100vh",background:"#080C08",display:"flex",flexDirection:"column",fontFamily:"'DM Sans',sans-serif",overflow:"hidden" }}>
@@ -870,21 +945,25 @@ export default function App() {
       <div style={{ padding:"10px 18px",borderBottom:"1px solid #111C11",display:"flex",alignItems:"center",justifyContent:"space-between",background:"#0C1210",flexShrink:0 }}>
         <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:"#00E676",letterSpacing:2 }}>EDGEMIND</div>
         <div style={{ display:"flex",gap:5 }}>
-          {[{v:`$${rules.profitTarget.value||rules.profitTarget.defaultVal}`,c:"#00E676",l:"TARGET"},{v:`$${rules.lossLimit.value||rules.lossLimit.defaultVal}`,c:"#EF4444",l:"LIMIT"},{v:`${rules.sessionStart.value}–${rules.sessionEnd.value}`,c:"#00BFA5",l:"WINDOW"}].map(r=>(
+          {[
+            { v:`$${rules.profitTarget.value||rules.profitTarget.defaultVal}`, c:"#00E676",  l:"TARGET" },
+            { v:`$${rules.lossLimit.value||rules.lossLimit.defaultVal}`,       c:"#EF4444",  l:"LIMIT"  },
+            { v:`${rules.sessionStart.value||rules.sessionStart.defaultVal}–${rules.sessionEnd.value||rules.sessionEnd.defaultVal}`, c:"#00BFA5", l:"WINDOW" },
+          ].map(r=>(
             <div key={r.l} style={{ padding:"3px 9px",background:"#0F150F",border:`1px solid ${r.c}18`,borderRadius:4,textAlign:"center" }}>
               <div style={{ fontSize:9,color:"#2D4A2D",letterSpacing:"0.08em",fontWeight:700 }}>{r.l}</div>
               <div style={{ fontSize:11,color:r.c,fontWeight:700,marginTop:1 }}>{r.v}</div>
             </div>
           ))}
         </div>
-        <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-          {/* Discipline Score Badge */}
+        <div style={{ display:"flex",alignItems:"center",gap:10 }}>
           <div style={{ padding:"3px 10px",background:`${sc}15`,border:`1px solid ${sc}30`,borderRadius:6,textAlign:"center" }}>
             <div style={{ fontSize:9,color:sc,fontWeight:700,letterSpacing:"0.06em" }}>DISCIPLINE</div>
             <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:sc,lineHeight:1 }}>{disciplineScore} <span style={{ fontSize:9 }}>{scoreLabel(disciplineScore)}</span></div>
           </div>
-          {streak>0 && <span style={{ fontSize:11,padding:"3px 8px",background:"#00E67615",border:"1px solid #00E67625",borderRadius:10,color:"#00E676" }}>🔥 {streak}d</span>}
+          {streak > 0 && <span style={{ fontSize:11,padding:"3px 8px",background:"#00E67615",border:"1px solid #00E67625",borderRadius:10,color:"#00E676" }}>🔥 {streak}d</span>}
           <span style={{ fontSize:12,color:"#2D4A2D",fontWeight:500 }}>{profile.name}</span>
+          <button onClick={handleLogout} style={{ padding:"4px 10px",background:"transparent",border:"1px solid #182818",borderRadius:4,color:"#2D4A2D",fontSize:11,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,transition:"all 0.15s" }}>LOG OUT</button>
         </div>
       </div>
 
@@ -893,160 +972,142 @@ export default function App() {
         {TABS.map(([id,label])=>(
           <button key={id} className="tab" onClick={()=>setActiveTab(id)} style={{ padding:"10px 18px",background:"transparent",border:"none",borderBottom:activeTab===id?"2px solid #00E676":"2px solid transparent",color:activeTab===id?"#00E676":"#2D4A2D",fontSize:13,cursor:"pointer",fontWeight:activeTab===id?600:400,fontFamily:"'DM Sans',sans-serif",transition:"color 0.15s" }}>{label}</button>
         ))}
-        {/* Emergency Stop */}
-        <button onClick={triggerEmergencyStop} className={emergencyActive?"emergency-pulse":""} style={{ marginLeft:"auto",marginRight:12,marginTop:6,marginBottom:6,padding:"4px 12px",background:"#EF444418",border:"1px solid #EF444430",borderRadius:6,color:"#EF4444",fontSize:11,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,fontWeight:700,transition:"all 0.15s" }}>
-          🚨 STOP
-        </button>
       </div>
 
-      {/* COACH TAB */}
-      {activeTab==="coach" && <>
-        <div style={{ flex:1,overflowY:"auto",padding:"18px 18px 0",display:"flex",flexDirection:"column",gap:14 }}>
-
-          {/* Pre-session quiz CTA */}
-          {!quizAnswers && messages.length > 0 && (
-            <div className="up" style={{ padding:"12px 16px",background:"#00E67610",border:"1px solid #00E67625",borderRadius:10,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0 }}>
-              <div>
-                <div style={{ fontSize:12,color:"#00E676",fontWeight:700 }}>🌅 PRE-SESSION CHECK</div>
-                <div style={{ fontSize:11,color:"#3D6B3D",marginTop:2 }}>2 min quiz · Helps coach calibrate for today</div>
-              </div>
-              <button onClick={()=>{ setQuizStep(0); setShowQuiz(true); }} style={{ padding:"7px 14px",background:"#00E676",border:"none",borderRadius:6,color:"#080C08",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1 }}>START →</button>
-            </div>
-          )}
-
-          {quizAnswers && (
-            <div style={{ padding:"8px 14px",background:"#0F150F",border:"1px solid #182818",borderRadius:8,display:"flex",gap:16,alignItems:"center" }}>
-              <div style={{ fontSize:11,color:"#3D6B3D" }}>Today: Sleep <strong style={{ color:quizAnswers.sleep<=2?"#EF4444":"#00E676" }}>{quizAnswers.sleep}/5</strong> · Stress <strong style={{ color:quizAnswers.stress>=4?"#EF4444":"#00E676" }}>{quizAnswers.stress}/5</strong> · Pressure <strong style={{ color:quizAnswers.pressure==="yes"?"#EF4444":"#00E676" }}>{quizAnswers.pressure}</strong></div>
-              <button onClick={()=>{ setQuizAnswers(null); setQuizStep(0); setTempQuiz({sleep:3,stress:3,pressure:"no"}); setShowQuiz(true); }} style={{ marginLeft:"auto",fontSize:10,color:"#2D4A2D",background:"transparent",border:"none",cursor:"pointer" }}>retake</button>
-            </div>
-          )}
-
-          {messages.map((msg,i)=>(
-            <div key={i} className="msg" style={{ display:"flex",flexDirection:msg.role==="user"?"row-reverse":"row",gap:10,alignItems:"flex-start" }}>
-              <div style={{ width:28,height:28,borderRadius:6,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,background:msg.role==="user"?"#182818":"#0F150F",border:`1px solid ${msg.role==="user"?"#1E3020":"#182818"}` }}>
-                {msg.role==="user"?"👤":"🎯"}
-              </div>
-              <div style={{ maxWidth:"76%",display:"flex",flexDirection:"column",gap:3,alignItems:msg.role==="user"?"flex-end":"flex-start" }}>
-                <div style={{ padding:"11px 14px",borderRadius:msg.role==="user"?"10px 3px 10px 10px":"3px 10px 10px 10px",background:msg.role==="user"?"#182818":"#0F150F",border:`1px solid ${msg.role==="user"?"#1E3020":"#182818"}`,fontSize:13,lineHeight:1.75,color:msg.role==="user"?"#B8E8FF":"#B8E8B8",whiteSpace:"pre-wrap" }}>
-                  <Md text={msg.content}/>
-                </div>
-                <div style={{ fontSize:10,color:"#1A301A",padding:"0 3px" }}>{msg.role==="assistant"?"Coach":"You"} · {msg.time}</div>
-              </div>
-            </div>
-          ))}
-          {loading && (
-            <div className="msg" style={{ display:"flex",gap:10 }}>
-              <div style={{ width:28,height:28,borderRadius:6,background:"#0F150F",border:"1px solid #182818",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12 }}>🎯</div>
-              <div style={{ padding:"13px 16px",background:"#0F150F",border:"1px solid #182818",borderRadius:"3px 10px 10px 10px",display:"flex",gap:5,alignItems:"center" }}>
-                {[0,0.2,0.4].map((d,i)=><div key={i} className="dot" style={{ width:6,height:6,borderRadius:"50%",background:"#00E676",animationDelay:`${d}s` }}/>)}
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef}/>
-        </div>
-
-        {/* Quick replies */}
-        <div style={{ padding:"10px 18px 0",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0 }}>
-          {[
-            `Done. Made $${rules.profitTarget.value||500}. Rules: Yes ✅`,
-            `Done. Lost $${rules.lossLimit.value||250}. Rules: Yes ✅`,
-            "I want to keep trading 🚨",
-            "I broke a rule",
-            "Morning check-in",
-            "Weekly review",
-          ].map(s=>(
-            <button key={s} className="qbtn" onClick={()=>setInput(s)} style={{ padding:"4px 10px",background:"transparent",border:"1px solid #182818",borderRadius:14,color:"#2D4A2D",fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",transition:"all 0.15s" }}>{s}</button>
-          ))}
-        </div>
-
-        {/* Input */}
-        <div style={{ padding:"10px 18px 16px",flexShrink:0 }}>
-          <div style={{ display:"flex",gap:8,background:"#0F150F",border:"1px solid #182818",borderRadius:10,padding:"8px 12px",alignItems:"flex-end" }}>
-            <textarea ref={inputRef} value={input} onChange={e=>setInput(e.target.value)}
-              onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage();}}}
-              placeholder="Check in or talk it through... (Enter to send)"
-              rows={1}
-              style={{ flex:1,background:"transparent",border:"none",color:"#D4F5D4",fontSize:13,fontFamily:"'DM Sans',sans-serif",resize:"none",lineHeight:1.5,maxHeight:100,overflowY:"auto" }}
-              onInput={e=>{e.target.style.height="auto";e.target.style.height=Math.min(e.target.scrollHeight,100)+"px";}}
-            />
-            <button onClick={()=>sendMessage()} disabled={loading||!input.trim()} style={{ width:32,height:32,borderRadius:6,background:!loading&&input.trim()?"#00E676":"#182818",border:"none",color:!loading&&input.trim()?"#080C08":"#2D4A2D",cursor:!loading&&input.trim()?"pointer":"not-allowed",fontSize:15,fontWeight:800,flexShrink:0,transition:"all 0.15s" }}>↑</button>
-          </div>
-          <div style={{ textAlign:"center",marginTop:6,fontSize:10,color:"#111C11" }}>The coach is always on. Your rules never sleep.</div>
-        </div>
-      </>}
-
-      {/* STATS TAB */}
-      {activeTab==="stats" && (
+      {/* ── STATS TAB ── */}
+      {activeTab === "stats" && (
         <div style={{ flex:1,overflowY:"auto",padding:18 }}>
-          {/* Discipline Score big display */}
-          <div style={{ background:"#0F150F",border:`1px solid ${sc}25`,borderRadius:14,padding:"20px",marginBottom:16,display:"flex",alignItems:"center",gap:20 }}>
-            <div style={{ flexShrink:0 }}>
-              <svg width="80" height="80" viewBox="0 0 80 80">
-                <circle cx="40" cy="40" r="34" fill="none" stroke="#182818" strokeWidth="6"/>
-                <circle cx="40" cy="40" r="34" fill="none" stroke={sc} strokeWidth="6"
-                  strokeDasharray={`${(disciplineScore/100)*213} 213`}
-                  strokeLinecap="round"
-                  transform="rotate(-90 40 40)"
-                  style={{ transition:"stroke-dasharray 1s ease" }}
-                />
-                <text x="40" y="44" textAnchor="middle" fill={sc} fontSize="18" fontFamily="'Bebas Neue',sans-serif" letterSpacing="1">{disciplineScore}</text>
-              </svg>
+
+          {/* 4 metric cards */}
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20 }}>
+            <div style={{ padding:"16px 18px",background:"#0F150F",border:`1px solid ${sc}30`,borderRadius:12 }}>
+              <div style={{ fontSize:10,color:"#2D4A2D",fontWeight:700,letterSpacing:"0.06em",marginBottom:8 }}>DISCIPLINE SCORE</div>
+              <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:sc,lineHeight:1 }}>{disciplineScore}</div>
+              <div style={{ fontSize:11,color:sc,fontWeight:700,marginTop:4 }}>{scoreLabel(disciplineScore)}</div>
             </div>
-            <div>
-              <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:sc,letterSpacing:1 }}>{scoreLabel(disciplineScore)} TRADER</div>
-              <div style={{ fontSize:12,color:"#3D6B3D",marginTop:4,lineHeight:1.6 }}>
-                {disciplineScore >= 80 ? "You're operating at an elite level. Protect this." :
-                 disciplineScore >= 60 ? "Solid foundation. Keep building the streak." :
-                 disciplineScore >= 40 ? "You're getting there. Consistency is everything." :
-                 "Day 1 of the rest of your trading life. Start the streak."}
+            <div style={{ padding:"16px 18px",background:"#0F150F",border:"1px solid #182818",borderRadius:12 }}>
+              <div style={{ fontSize:10,color:"#2D4A2D",fontWeight:700,letterSpacing:"0.06em",marginBottom:8 }}>TOTAL P&L</div>
+              <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:totalPnl>=0?"#00E676":"#EF4444",lineHeight:1 }}>
+                {sessions.length ? `${totalPnl>=0?"+":""}$${Math.abs(totalPnl).toLocaleString()}` : "—"}
               </div>
-              {sessions.length === 0 && <div style={{ fontSize:11,color:"#1A301A",marginTop:6 }}>Complete your first check-in to start scoring.</div>}
+              <div style={{ fontSize:11,color:"#2D4A2D",marginTop:4 }}>all sessions</div>
+            </div>
+            <div style={{ padding:"16px 18px",background:"#0F150F",border:"1px solid #182818",borderRadius:12 }}>
+              <div style={{ fontSize:10,color:"#2D4A2D",fontWeight:700,letterSpacing:"0.06em",marginBottom:8 }}>SESSIONS</div>
+              <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:"#F0FFF4",lineHeight:1 }}>{sessions.length || "0"}</div>
+              <div style={{ fontSize:11,color:"#2D4A2D",marginTop:4 }}>total logged</div>
+            </div>
+            <div style={{ padding:"16px 18px",background:"#0F150F",border:"1px solid #182818",borderRadius:12 }}>
+              <div style={{ fontSize:10,color:"#2D4A2D",fontWeight:700,letterSpacing:"0.06em",marginBottom:8 }}>DISCIPLINE RATE</div>
+              <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:40,color:disciplineRate>=80?"#00E676":disciplineRate>=50?"#FFD166":"#EF4444",lineHeight:1 }}>
+                {sessions.length ? `${disciplineRate}%` : "—"}
+              </div>
+              <div style={{ fontSize:11,color:"#2D4A2D",marginTop:4 }}>rules followed</div>
             </div>
           </div>
 
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16 }}>
-            {[
-              {l:"Total Sessions",v:sessions.length||"—",c:"#F0FFF4"},
-              {l:"🔥 Streak",v:streak>0?`${streak} days`:"—",c:"#00E676"},
-              {l:"Discipline Rate",v:sessions.length?`${disciplineRate}%`:"—",c:disciplineRate>=80?"#00E676":disciplineRate>=50?"#FFD166":"#EF4444"},
-              {l:"Total P&L",v:sessions.length?`${totalPnl>=0?"+":""}$${totalPnl.toLocaleString()}`:"—",c:totalPnl>=0?"#00E676":"#EF4444"},
-            ].map(s=>(
-              <div key={s.l} style={{ padding:"16px",background:"#0F150F",border:"1px solid #182818",borderRadius:10 }}>
-                <div style={{ fontSize:10,color:"#2D4A2D",marginBottom:6,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase" }}>{s.l}</div>
-                <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:30,color:s.c,letterSpacing:1 }}>{s.v}</div>
+          {/* Cumulative P&L Chart */}
+          <div style={{ background:"#0F150F",border:"1px solid #182818",borderRadius:12,padding:"16px 18px",marginBottom:20 }}>
+            <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#F0FFF4",letterSpacing:1,marginBottom:14 }}>CUMULATIVE P&L</div>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={140}>
+                <LineChart data={chartData} margin={{ top:4,right:4,left:0,bottom:0 }}>
+                  <XAxis dataKey="date" tick={{ fill:"#2D4A2D",fontSize:10 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill:"#2D4A2D",fontSize:10 }} axisLine={false} tickLine={false} tickFormatter={v=>`$${v}`} width={52} />
+                  <Tooltip
+                    contentStyle={{ background:"#0C1210",border:"1px solid #182818",borderRadius:8,color:"#D4F5D4",fontSize:12 }}
+                    formatter={v=>[`${v>=0?"+":""}$${v.toLocaleString()}`,"Cumulative P&L"]}
+                    labelStyle={{ color:"#4E8050" }}
+                  />
+                  <Line type="monotone" dataKey="cumPnl" stroke="#00E676" strokeWidth={2} dot={false} activeDot={{ r:4,fill:"#00E676" }} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height:140,display:"flex",alignItems:"center",justifyContent:"center",color:"#1A301A",fontSize:12 }}>
+                No sessions yet. Log your first session via WhatsApp.
               </div>
-            ))}
+            )}
           </div>
 
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#F0FFF4",letterSpacing:1,marginBottom:10 }}>SESSION HISTORY</div>
-          {sessions.length===0 ? (
-            <div style={{ padding:24,textAlign:"center",color:"#1A301A",fontSize:13,background:"#0F150F",border:"1px solid #182818",borderRadius:10 }}>
-              No sessions yet. Send "Done. Made $X. Rules: Yes" after your first trade.
-            </div>
-          ) : (
-            <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
-              {[...sessions].reverse().map((s,i)=>(
-                <div key={i} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 14px",background:"#0F150F",border:"1px solid #182818",borderRadius:8 }}>
-                  <span style={{ fontSize:11,color:"#2D4A2D" }}>{s.date}</span>
-                  <span style={{ fontSize:13,fontWeight:700,color:s.pnl>=0?"#00E676":"#EF4444" }}>{s.pnl>=0?"+":""}${s.pnl}</span>
-                  <span style={{ fontSize:11,padding:"2px 8px",borderRadius:10,background:s.rulesFollowed?"#00E67618":"#EF444418",color:s.rulesFollowed?"#00E676":"#EF4444",fontWeight:600 }}>
-                    {s.rulesFollowed?"✓ Rules kept":"✗ Rules broken"}
-                  </span>
+          {/* Calendar + Session History */}
+          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
+
+            {/* Monthly Calendar */}
+            <div style={{ background:"#0F150F",border:"1px solid #182818",borderRadius:12,padding:"16px 18px" }}>
+              <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14 }}>
+                <button onClick={goCalPrev} style={{ background:"transparent",border:"none",color:"#3D6B3D",cursor:"pointer",fontSize:18,padding:"0 4px",lineHeight:1 }}>‹</button>
+                <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#F0FFF4",letterSpacing:1 }}>
+                  {new Date(calYear,calMonth).toLocaleString("default",{month:"long",year:"numeric"}).toUpperCase()}
+                </div>
+                <button onClick={goCalNext} style={{ background:"transparent",border:"none",color:"#3D6B3D",cursor:"pointer",fontSize:18,padding:"0 4px",lineHeight:1 }}>›</button>
+              </div>
+
+              {/* Day headers */}
+              <div style={{ display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:6 }}>
+                {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>(
+                  <div key={d} style={{ textAlign:"center",fontSize:9,color:"#2D4A2D",fontWeight:700,padding:"2px 0" }}>{d}</div>
+                ))}
+              </div>
+
+              {/* Calendar grid */}
+              {calWeeks.map((week,wi)=>(
+                <div key={wi} style={{ display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:2 }}>
+                  {week.map((day,di)=>{
+                    const dateStr = day ? `${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,"0")}-${String(day.getDate()).padStart(2,"0")}` : null;
+                    const sess    = dateStr ? sessionsByDate[dateStr] : null;
+                    const isToday = day && new Date().toDateString() === day.toDateString();
+                    return (
+                      <div key={di} className="cal-day" style={{
+                        aspectRatio:"1",borderRadius:4,padding:2,
+                        background: !day ? "transparent" : sess ? (sess.pnl>=0?"#00E67614":"#EF444414") : isToday ? "#182818" : "#0C1210",
+                        border: sess ? `1px solid ${sess.pnl>=0?"#00E67635":"#EF444435"}` : isToday ? "1px solid #2D4A2D" : "1px solid transparent",
+                        display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:sess?"pointer":"default",
+                        transition:"border-color 0.15s",
+                      }}>
+                        {day && <div style={{ fontSize:8,color:sess?(sess.pnl>=0?"#00E676":"#EF4444"):isToday?"#4E8050":"#2D4A2D",fontWeight:isToday?700:400 }}>{day.getDate()}</div>}
+                        {sess && <div style={{ fontSize:7,fontWeight:700,color:sess.pnl>=0?"#00E676":"#EF4444",marginTop:1 }}>{sess.pnl>=0?"+":""}${Math.abs(sess.pnl)}</div>}
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
             </div>
-          )}
+
+            {/* Session History */}
+            <div style={{ background:"#0F150F",border:"1px solid #182818",borderRadius:12,padding:"16px 18px",overflowY:"auto",maxHeight:400 }}>
+              <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#F0FFF4",letterSpacing:1,marginBottom:14 }}>SESSION HISTORY</div>
+              {sessions.length === 0 ? (
+                <div style={{ padding:"24px 0",textAlign:"center",color:"#1A301A",fontSize:12,lineHeight:1.7 }}>
+                  No sessions yet.<br/>
+                  <span style={{ color:"#2D4A2D" }}>Send <em>"Done. Made $X. Rules: Yes"</em><br/>via WhatsApp to log your first session.</span>
+                </div>
+              ) : (
+                <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
+                  {[...sessions].reverse().slice(0,20).map((s,i)=>(
+                    <div key={i} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 12px",background:"#0C1210",borderLeft:`3px solid ${s.rulesFollowed?"#00E676":"#EF4444"}`,borderRadius:"0 6px 6px 0" }}>
+                      <span style={{ fontSize:11,color:"#3D6B3D",minWidth:56 }}>{fmtDate(s.session_date||s.date)}</span>
+                      <span style={{ fontSize:13,fontWeight:700,color:s.pnl>=0?"#00E676":"#EF4444" }}>{s.pnl>=0?"+":""}${Math.abs(s.pnl).toLocaleString()}</span>
+                      <span style={{ fontSize:10,padding:"2px 7px",borderRadius:10,background:s.rulesFollowed?"#00E67615":"#EF444415",color:s.rulesFollowed?"#00E676":"#EF4444",fontWeight:600 }}>
+                        {s.rulesFollowed?"✓ Rules":"✗ Rules"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* RULES TAB */}
-      {activeTab==="rules" && (
+      {/* ── RULES TAB ── */}
+      {activeTab === "rules" && (
         <div style={{ flex:1,overflowY:"auto",padding:18 }}>
           <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#F0FFF4",letterSpacing:1,marginBottom:4 }}>YOUR RULE SYSTEM</div>
           <div style={{ fontSize:12,color:"#2D4A2D",marginBottom:20 }}>Set by you. Enforced by your coach. These do not bend.</div>
+
           {CATEGORIES.map(cat=>{
             const catRules = enabledRules.filter(([,v])=>v.category===cat.id);
-            if(catRules.length===0) return null;
+            if (catRules.length === 0) return null;
             return (
               <div key={cat.id} style={{ marginBottom:14 }}>
                 <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#00E676",letterSpacing:1,marginBottom:8 }}>{cat.label}</div>
@@ -1065,10 +1126,12 @@ export default function App() {
               </div>
             );
           })}
+
           <div style={{ padding:"16px",background:"#00E67608",border:"1px solid #00E67618",borderRadius:10,marginTop:8 }}>
             <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#00E676",letterSpacing:1,marginBottom:6 }}>YOUR CHALLENGE TO OVERCOME</div>
-            <div style={{ fontSize:14,color:"#D4F5D4",lineHeight:1.6 }}>{(profile.challenges||[]).join(", ")}</div>
+            <div style={{ fontSize:14,color:"#D4F5D4",lineHeight:1.6 }}>{(profile.challenges||[]).join(", ") || "Not set"}</div>
           </div>
+
           <div style={{ padding:"14px 16px",background:"#0F150F",border:"1px solid #182818",borderRadius:10,marginTop:10 }}>
             <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#3D6B3D",letterSpacing:1,marginBottom:6 }}>THE RULE ABOVE ALL RULES</div>
             <div style={{ fontSize:13,color:"#2D4A2D",lineHeight:1.7,fontStyle:"italic" }}>
@@ -1076,7 +1139,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Referral in rules tab */}
           <div style={{ padding:"14px 16px",background:"#0F150F",border:"1px solid #182818",borderRadius:10,marginTop:10 }}>
             <div style={{ fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#00E676",letterSpacing:1,marginBottom:8 }}>🎁 YOUR REFERRAL CODE</div>
             <div style={{ fontSize:12,color:"#3D6B3D",marginBottom:10,lineHeight:1.6 }}>Share with a fellow trader. They get 1 month free. You get your next month free.</div>
